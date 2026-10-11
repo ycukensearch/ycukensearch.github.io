@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Генератор картинок | Йцукен</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#eceff1; font-family:'Roboto',sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    min-height:100vh; padding:16px;
+  }
+  .card {
+    background:#fff; border-radius:4px;
+    box-shadow:0 2px 5px rgba(0,0,0,.16),0 2px 10px rgba(0,0,0,.12);
+    width:100%; max-width:640px; padding:24px;
+  }
+  h1 {
+    font-size:24px; font-weight:500; color:#E65100; /* тёмно-оранжевый */
+    margin-bottom:4px; display:flex; align-items:center; gap:8px;
+  }
+  h1 .material-icons { font-size:32px; color:#FF6D00; }
+  .sub { font-size:14px; color:#EF6C00; margin-bottom:24px; }
+  .preview { margin-bottom:24px; }
+  .placeholder {
+    width:100%; height:240px; background:#FFF3E0; border-radius:4px;
+    border:1px dashed #FFB74D; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; color:#EF6C00; gap:8px;
+  }
+  .placeholder .material-icons { font-size:48px; color:#FFB74D; }
+  canvas { width:100%; max-height:480px; border-radius:4px; box-shadow:0 1px 3px rgba(0,0,0,.2); display:block; background:#f5f5f5; }
+  .fade-in { animation:fadeIn .6s ease-in; }
+  @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+  .input-group { position:relative; margin-bottom:16px; }
+  .input-label {
+    position:absolute; left:16px; top:16px; font-size:16px; color:#EF6C00;
+    pointer-events:none; transition:all .2s; background:transparent; padding:0 4px;
+  }
+  .query {
+    width:100%; padding:16px 16px 14px; font-size:16px; font-family:'Roboto',sans-serif;
+    border:none; border-bottom:2px solid #FFCC80; background:transparent;
+    outline:none; color:#212121;
+  }
+  .query:focus { border-bottom-color:#FF6D00; }
+  .query:focus + .input-label,
+  .query:not(:placeholder-shown) + .input-label {
+    top:-8px; left:12px; font-size:12px; color:#E65100; background:#fff;
+  }
+  .btn {
+    background:#FF6D00; color:#fff; border:none; padding:12px 24px;
+    font-size:16px; font-weight:500; font-family:'Roboto',sans-serif;
+    text-transform:uppercase; letter-spacing:.8px; border-radius:2px;
+    cursor:pointer; box-shadow:0 2px 4px rgba(255,109,0,.35);
+    display:inline-flex; align-items:center; justify-content:center;
+    gap:8px; width:100%; height:48px;
+    transition:background .2s, box-shadow .2s;
+  }
+  .btn:hover:not(:disabled) {
+    background:#E65100;
+    box-shadow:0 4px 8px rgba(255,109,0,.45);
+  }
+  .btn:disabled { background:#FFCC80; color:#FFF3E0; cursor:not-allowed; box-shadow:none; }
+  .btn .material-icons { font-size:20px; color:#fff; }
+  .progress {
+    display:flex; justify-content:center; align-items:center; gap:12px;
+    margin-top:16px; visibility:hidden; height:32px; opacity:0;
+    transition:opacity .2s,visibility .2s;
+  }
+  .progress.active { visibility:visible; opacity:1; }
+  .spinner {
+    width:24px; height:24px; border:3px solid #FFE0B2;
+    border-top:3px solid #FF6D00; border-radius:50%;
+    animation:spin 1s linear infinite;
+  }
+  @keyframes spin { to{transform:rotate(360deg);} }
+  .status { font-size:14px; color:#EF6C00; }
+  .divider { height:1px; background:#FFE0B2; margin:24px 0 16px; }
+  .hint { font-size:12px; color:#EF6C00; text-align:center; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1><span class="material-icons">auto_awesome</span> Йцукен Генератор картинок</h1>
+  <div class="sub">Собираю сцену по вашему запросу</div>
+
+  <div class="preview">
+    <div class="placeholder" id="placeholder">
+      <span class="material-icons">brush</span>
+      <span>Здесь появится картинка</span>
+    </div>
+    <canvas id="canvas" class="hidden" width="768" height="576"></canvas>
+  </div>
+
+  <div class="input-group">
+    <input type="text" id="queryInput" class="query" placeholder=" " autocomplete="off">
+    <label for="queryInput" class="input-label">Введите запрос (кот, СССР, Беларусь...)</label>
+  </div>
+
+  <button id="generateBtn" class="btn">
+    <span class="material-icons">auto_awesome</span> Сгенерировать
+  </button>
+
+  <div class="progress" id="progress">
+    <div class="spinner"></div>
+    <span class="status" id="status">Собираю сцену...</span>
+  </div>
+
+  <div class="divider"></div>
+  <div class="hint">Флаги: СССР, Беларусь, Китай, Индия, Бразилия, Сербия</div>
+</div>
+
+<script>
+(function(){
+  const input = document.getElementById('queryInput');
+  const btn = document.getElementById('generateBtn');
+  const placeholder = document.getElementById('placeholder');
+  const canvas = document.getElementById('canvas');
+  const progress = document.getElementById('progress');
+  const status = document.getElementById('status');
+  let busy = false, timer = null;
+
+  function hash(str){
+    let h = 2166136261;
+    for (let i=0;i<str.length;i++){
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  function mulberry32(a){
+    return function(){
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  // ======================= БИБЛИОТЕКА РИСОВАНИЯ =======================
+  // (без изменений — кот, собака, дом, дерево, цветок, машина, ракета,
+  //  дракон, луна, звезда, птица, рыба, робот, гора)
+
+  function drawSun(ctx,x,y,s){
+    ctx.save();
+    ctx.fillStyle = '#FFD54F';
+    ctx.beginPath(); ctx.arc(x,y,s,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#FFB300'; ctx.lineWidth = s*0.15;
+    for (let i=0;i<12;i++){
+      const a = i/12*Math.PI*2;
+      ctx.beginPath();
+      ctx.moveTo(x+Math.cos(a)*s*1.3, y+Math.sin(a)*s*1.3);
+      ctx.lineTo(x+Math.cos(a)*s*1.7, y+Math.sin(a)*s*1.7);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawCloud(ctx,x,y,s){
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath();
+    ctx.arc(x,y,s,0,Math.PI*2);
+    ctx.arc(x+s*0.9,y+s*0.1,s*0.8,0,Math.PI*2);
+    ctx.arc(x-s*0.9,y+s*0.1,s*0.7,0,Math.PI*2);
+    ctx.arc(x+s*0.3,y-s*0.6,s*0.7,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawCat(ctx,x,y,s){
+    ctx.save();
+    ctx.fillStyle = '#8D6E63';
+    ctx.beginPath();
+    ctx.ellipse(x, y+s*0.6, s*1.0, s*0.75, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y-s*0.4, s*0.7, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x-s*0.55, y-s*0.9);
+    ctx.lineTo(x-s*0.85, y-s*1.5);
+    ctx.lineTo(x-s*0.15, y-s*1.0);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x+s*0.55, y-s*0.9);
+    ctx.lineTo(x+s*0.85, y-s*1.5);
+    ctx.lineTo(x+s*0.15, y-s*1.0);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#FFF';
+    ctx.beginPath(); ctx.arc(x-s*0.25, y-s*0.45, s*0.18, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+s*0.25, y-s*0.45, s*0.18, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#212121';
+    ctx.beginPath(); ctx.arc(x-s*0.25, y-s*0.45, s*0.09, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+s*0.25, y-s*0.45, s*0.09, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#F48FB1';
+    ctx.beginPath();
+    ctx.moveTo(x-s*0.08, y-s*0.15);
+    ctx.lineTo(x+s*0.08, y-s*0.15);
+    ctx.lineTo(x, y);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#212121'; ctx.lineWidth = s*0.04;
+    ctx.beginPath();
+    ctx.moveTo(x,y);
+    ctx.quadraticCurveTo(x-s*0.15, y+s*0.12, x-s*0.3, y+s*0.05);
+    ctx.moveTo(x,y);
+    ctx.quadraticCurveTo(x+s*0.15, y+s*0.12, x+s*0.3, y+s*0.05);
+    ctx.stroke();
+    ctx.lineWidth = s*0.03;
+    ctx.beginPath();
+    ctx.moveTo(x-s*0.3, y-s*0.05); ctx.lineTo(x-s*0.9, y-s*0.15);
+    ctx.moveTo(x-s*0.3, y+0.02);    ctx.lineTo(x-s*0.9, y+0.05);
+    ctx.moveTo(x+s*0.3, y-s*0.05); ctx.lineTo(x+s*0.9, y-s*0.15);
+    ctx.moveTo(x+s*0.3, y+0.02);    ctx.lineTo(x+s*0.9, y+0.05);
+    ctx.stroke();
+    ctx.strokeStyle = '#8D6E63'; ctx.lineWidth = s*0.25;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x+s*0.9, y+s*0.7);
+    ctx.quadraticCurveTo(x+s*1.8, y+s*0.5, x+s*1.6, y-s*0.2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawDog(ctx,x,y,s){
+    ctx.save();
+    ctx.fillStyle = '#A1887F';
+    ctx.beginPath();
+    ctx.ellipse(x, y+s*0.6, s*1.05, s*0.75, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y-s*0.4, s*0.75, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(x-s*0.7, y-s*0.3, s*0.22, s*0.55, 0.3, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(x+s*0.7, y-s*0.3, s*0.22, s*0.55, -0.3, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#D7CCC8';
+    ctx.beginPath();
+    ctx.ellipse(x, y-s*0.05, s*0.45, s*0.35, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#212121';
+    ctx.beginPath(); ctx.arc(x-s*0.25, y-s*0.5, s*0.1, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+s*0.25, y-s*0.5, s*0.1, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#3E2723';
+    ctx.beginPath(); ctx.arc(x, y-s*0.1, s*0.13, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#EF5350';
+    ctx.beginPath();
+    ctx.ellipse(x, y+s*0.1, s*0.1, s*0.18, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#A1887F'; ctx.lineWidth = s*0.2; ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(x+s*0.9, y+s*0.6);
+    ctx.quadraticCurveTo(x+s*1.5, y+s*0.3, x+s*1.4, y-s*0.3);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawHouse(ctx,x,y,s){
+    ctx.save();
+    ctx.fillStyle = '#FFE0B2';
+    ctx.fillRect(x-s, y-s*0.3, s*2, s*1.5);
+    ctx.fillStyle = '#BF360C';
+    ctx.beginPath();
+    ctx.moveTo(x-s*1.15, y-s*0.3);
+    ctx.lineTo(x, y-s*1.3);
+    ctx.lineTo(x+s*1.15, y-s*0.3);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#5D4037';
+    ctx.fillRect(x-s*0.25, y+s*0.4, s*0.5, s*0.8);
+    ctx.fillStyle = '#81D4FA';
+    ctx.fillRect(x+s*0.4, y+s*0.4, s*0.4, s*0.4);
+    ctx.strokeStyle = '#5D4037'; ctx.lineWidth = s*0.05;
+    ctx.strokeRect(x+s*0.4, y+s*0.4, s*0.4, s*0.4);
+    ctx.beginPath();
+    ctx.moveTo(x+s*0.6, y+s*0.4); ctx.lineTo(x+s*0.6, y+s*0.8);
+    ctx.moveTo(x+s*0.4, y+s*0.6); ctx.lineTo(x+s*0.8, y+s*0.6);
+    ctx.stroke();
+    ctx.fillStyle = '#6D4C41';
+    ctx.fillRect(x+s*0.5, y-s*1.1, s*0.25, s*0.5);
+    ctx.restore();
+  }
+
+  function drawTree(ctx,x,y,s){
+    ctx.save();
+    ctx.fillStyle = '#5D4037';
+    ctx.fillRect(x-s*0.15, y, s*0.3, s*1.3);
+    ctx.fillStyle = '#2E7D32';
+    ctx.beginPath(); ctx.arc(x, y-s*0.3, s*0.85, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#388E3C';
+    ctx.beginPath(); ctx.arc(x-s*0.5, y-s*0.1, s*0.65, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+s*0.5, y-s*0.1, s*0.65, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#43A047';
+    ctx.beginPath(); ctx.arc(x, y-s*0.6, s*0.6, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawFlower(ctx,x,y,s){
+    ctx.save();
+    ctx.strokeStyle = '#2E7D32'; ctx.lineWidth = s*0.12;
+    ctx.beginPath();
+    ctx.moveTo(x, y+s);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.fillStyle = '#43A047';
+    ctx.beginPath();
+    ctx.ellipse(x+s*0.25, y+s*0.5, s*0.3, s*0.15, -0.5, 0, Math.PI*2);
+    ctx.fill();
+    const petalColors = ['#EC407A','#F06292','#F48FB1','#FF80AB'];
+    for (let i=0;i<8;i++){
+      ctx.fillStyle = petalColors[i%petalColors.length];
+      const a = i/8*Math.PI*2;
+      ctx.beginPath();
+      ctx.ellipse(x+Math.cos(a)*s*0.35, y+Math.sin(a)*s*0.35, s*0.28, s*0.18, a, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#FDD835';
+    ctx.beginPath(); ctx.arc(x,y,s*0.25,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawCar(ctx,x,y,s){
+    ctx.save();
+    ctx.fillStyle = '#E53935';
+    ctx.beginPath();
+    ctx.moveTo(x-s, y+s*0.3);
+    ctx.lineTo(x-s*0.7, y-s*0.2);
+    ctx.lineTo(x+s*0.5, y-s*0.2);
+    ctx.lineTo(x+s, y+s*0.3);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#EF9A9A';
+    ctx.beginPath();
+    ctx.moveTo(x-s*0.55, y-s*0.2);
+    ctx.lineTo(x-s*0.3, y-s*0.7);
+    ctx.lineTo(x+s*0.3, y-s*0.7);
+    ctx.lineTo(x+s*0.5, y-s*0.2);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#B3E5FC';
+    ctx.fillRect(x-s*0.35, y-s*0.62, s*0.28, s*0.4);
+    ctx.fillRect(x+s*0.05, y-s*0.62, s*0.28, s*0.4);
+    ctx.fillStyle = '#212121';
+    ctx.beginPath(); ctx.arc(x-s*0.55, y+s*0.35, s*0.22, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+s*0.55, y+s*0.35, s*0.22, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#757575';
+    ctx.beginPath(); ctx.arc(x-s*0.55, y+s*0.35, s*0.1, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+s*0.55, y+s*0.35, s*0.1, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#FFF59D';
+    ctx.beginPath(); ctx.arc(x+s*0.95, y+s*0.1, s*0.1, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawRocket(ctx,x,y,s){
+    ctx.save();
+    ctx.fillStyle = '#ECEFF1';
+    ctx.beginPath();
+    ctx.moveTo(x, y-s*1.3);
+    ctx.quadraticCurveTo(x+s*0.5, y-s*0.3, x+s*0.5, y+s*0.7);
+    ctx.lineTo(x-s*0.5, y+s*0.7);
+    ctx.quadraticCurveTo(x-s*0.5, y-s*0.3, x, y-s*1.3);
+    ctx.fill();
+    ctx.fillStyle = '#E53935';
+    ctx.beginPath();
+    ctx.moveTo(x, y-s*1.3);
+    ctx.quadraticCurveTo(x+s*0.5, y-s*0.3, x+s*0.3, y-s*0.3);
+    ctx.lineTo(x-s*0.3, y-s*0.3);
+    ctx.quadraticCurveTo(x-s*0.5, y-s*0.3, x, y-s*1.3);
+    ctx.fill();
+    ctx.fillStyle = '#29B6F6';
+    ctx.beginPath(); ctx.arc(x, y-s*0.4, s*0.28, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#90A4AE'; ctx.lineWidth = s*0.07;
+    ctx.stroke();
+    ctx.fillStyle = '#E53935';
+    ctx.beginPath();
+    ctx.moveTo(x-s*0.5, y+s*0.2);
+    ctx.lineTo(x-s*1.0, y+s*0.9);
+    ctx.lineTo(x-s*0.5, y+s*0.7);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x+s*0.5, y+s*0.2);
+    ctx.lineTo(x+s*1.0, y+s*0.9);
+    ctx.lineTo(x+s*0.5, y+s*0.7);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#FFB300';
+    ctx.beginPath();
+    ctx.moveTo(x-s*0.3, y+s*0.7);
+    ctx.lineTo(x, y+s*1.4);
+    ctx.lineTo(x+s*0.3, y+s*0.7);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#FFEB3B';
+    ctx.beginPath();
+    ctx.moveTo(x-s*0.18, y+s*0.7);
+    ctx.lineTo(x, y+s*1.15);
+    ctx.lineTo(x+s*0.18, y+s*0.7);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawDragon(ctx,x,y,s){
+    ctx.save();
+    ctx.fillStyle = '#7B1FA2';
+    ctx.beginPath();
+    ctx.ellipse(x, y+s*0.4, s*1.1, s*0.7, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#9C27B0';
+    ctx.beginPath();
+    ctx.ellipse(x-s*0.9, y-s*0.3, s*0.7, s*0.55, -0.2, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(x-s*1.5, y-s*0.1, s*0.4, s*0.3, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#FFEB3B';
+    ctx.beginPath(); ctx.arc(x-s*1.0, y-s*0.45, s*0.15, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#212121';
+    ctx.beginPath(); ctx.arc(x-s*1.0, y-s*0.45, s*0.07, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#4A148C';
+    ctx.beginPath();
+    ctx.moveTo(x-s*0.7, y-s*0.8);
+    ctx.lineTo(x-s*0.85, y-s*1.4);
+    ctx.lineTo(x-s*0.55, y-s*0.85);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x-s*0.4, y-s*0.8);
+    ctx.lineTo(x-s*0.5, y-s*1.35);
+    ctx.lineTo(x-s*0.25, y-s*0.8);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#AB47BC';
+    ctx.beginPath();
+    ctx.moveTo(x-s*0.2, y-s*0.1);
+    ctx.quadraticCurveTo(x+s*0.6, y-s*1.6, x+s*1.4, y-s*0.9);
+    ctx.quadraticCurveTo(x+s*0.8, y-s*0.2, x+s*0.4, y-s*0.05);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#4A148C';
+    for (let i=0;i<5;i++){
+      const t = i/4;
+      const px = x - s*0.3 + t*s*1.4;
+      const py = y + s*0.05 - t*s*0.15;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(px+s*0.1, py-s*0.3);
+      ctx.lineTo(px+s*0.2, py);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.strokeStyle = '#7B1FA2'; ctx.lineWidth = s*0.2; ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(x+s*1.0, y+s*0.5);
+    ctx.quadraticCurveTo(x+s*1.8, y+s*0.7, x+s*1.7, y+s*0.1);
+    ctx.stroke();
+    ctx.fillStyle = '#FF7043';
+    ctx.beginPath();
+    ctx.moveTo(x-s*1.8, y-s*0.1);
+    ctx.lineTo(x-s*2.4, y-s*0.25);
+    ctx.lineTo(x-s*2.3, y+0.05);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawMoon(ctx,x,y,s){
+    ctx.save();
+    ctx.fillStyle = '#FFF9C4';
+    ctx.beginPath(); ctx.arc(x,y,s,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.05)';
+    ctx.beginPath(); ctx.arc(x-s*0.3,y-s*0.2,s*0.15,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+s*0.2,y+s*0.3,s*0.1,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x-s*0.1,y+s*0.4,s*0.08,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawStar(ctx,x,y,s){
+    ctx.save();
+    ctx.fillStyle = '#FFF59D';
+    ctx.beginPath();
+    for (let i=0;i<10;i++){
+      const r = i%2===0 ? s : s*0.4;
+      const a = i/10*Math.PI*2 - Math.PI/2;
+      const px = x+Math.cos(a)*r, py = y+Math.sin(a)*r;
+      i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBird(ctx,x,y,s){
+    ctx.save();
+    ctx.strokeStyle = '#37474F'; ctx.lineWidth = s*0.15; ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(x-s, y);
+    ctx.quadraticCurveTo(x-s*0.4, y-s*0.6, x, y);
+    ctx.quadraticCurveTo(x+s*0.4, y-s*0.6, x+s, y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawFish(ctx,x,y,s){
+    ctx.save();
+    ctx.fillStyle = '#FF7043';
+    ctx.beginPath();
+    ctx.ellipse(x, y, s*0.9, s*0.55, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x+s*0.8, y);
+    ctx.lineTo(x+s*1.4, y-s*0.5);
+    ctx.lineTo(x+s*1.4, y+s*0.5);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#FFF';
+    ctx.beginPath(); ctx.arc(x-s*0.4, y-s*0.1, s*0.15, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#212121';
+    ctx.beginPath(); ctx.arc(x-s*0.4, y-s*0.1, s*0.07, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawRobot(ctx,x,y,s){
+    ctx.save();
+    ctx.fillStyle = '#90A4AE';
+    ctx.fillRect(x-s*0.7, y-s*0.2, s*1.4, s*1.2);
+    ctx.fillStyle = '#B0BEC5';
+    ctx.fillRect(x-s*0.6, y-s*1.2, s*1.2, s*0.9);
+    ctx.fillStyle = '#00E5FF';
+    ctx.beginPath(); ctx.arc(x-s*0.25, y-s*0.8, s*0.13, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x+s*0.25, y-s*0.8, s*0.13, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#455A64';
+    ctx.fillRect(x-s*0.3, y-s*0.5, s*0.6, s*0.08);
+    ctx.strokeStyle = '#455A64'; ctx.lineWidth = s*0.06;
+    ctx.beginPath();
+    ctx.moveTo(x, y-s*1.2);
+    ctx.lineTo(x, y-s*1.55);
+    ctx.stroke();
+    ctx.fillStyle = '#F44336';
+    ctx.beginPath(); ctx.arc(x, y-s*1.6, s*0.1, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#90A4AE';
+    ctx.fillRect(x-s*1.1, y-s*0.1, s*0.3, s*0.9);
+    ctx.fillRect(x+s*0.8, y-s*0.1, s*0.3, s*0.9);
+    ctx.restore();
+  }
+
+  function drawMountain(ctx,x,y,s){
+    ctx.save();
+    ctx.fillStyle = '#546E7A';
+    ctx.beginPath();
+    ctx.moveTo(x-s, y+s*0.6);
+    ctx.lineTo(x, y-s);
+    ctx.lineTo(x+s, y+s*0.6);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ECEFF1';
+    ctx.beginPath();
+    ctx.moveTo(x-s*0.25, y-s*0.35);
+    ctx.lineTo(x, y-s);
+    ctx.lineTo(x+s*0.25, y-s*0.35);
+    ctx.lineTo(x+s*0.1, y-s*0.4);
+    ctx.lineTo(x-s*0.1, y-s*0.3);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // ============================================================
+  // ФЛАГИ ДРУЖЕСТВЕННЫХ СТРАН — готовые SVG с Wikimedia Commons
+  // ============================================================
+  const FLAGS = {
+    ussr: {
+      keys: ['ссср','soviet','советск','совет','союз','ussr'],
+      url: 'https://upload.wikimedia.org/wikipedia/commons/a/a9/Flag_of_the_Soviet_Union.svg',
+      label: 'Флаг СССР', image: null, loaded: false
+    },
+    belarus: {
+      keys: ['беларус','белорус','belarus','рб'],
+      url: 'https://upload.wikimedia.org/wikipedia/commons/8/85/Flag_of_Belarus.svg',
+      label: 'Флаг Беларуси', image: null, loaded: false
+    },
+    china: {
+      keys: ['китай','china','prc','кнр','китайск'],
+      url: 'https://upload.wikimedia.org/wikipedia/commons/f/fa/Flag_of_the_People%27s_Republic_of_China.svg',
+      label: 'Флаг Китая', image: null, loaded: false
+    },
+    india: {
+      keys: ['инди','india','индийск'],
+      url: 'https://upload.wikimedia.org/wikipedia/commons/4/41/Flag_of_India.svg',
+      label: 'Флаг Индии', image: null, loaded: false
+    },
+    brazil: {
+      keys: ['бразил','brazil','бразильск'],
+      url: 'https://upload.wikimedia.org/wikipedia/commons/0/05/Flag_of_Brazil.svg',
+      label: 'Флаг Бразилии', image: null, loaded: false
+    },
+    serbia: {
+      keys: ['серби','serbia','сербск'],
+      url: 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Flag_of_Serbia.svg',
+      label: 'Флаг Сербии', image: null, loaded: false
+    }
+  };
+
+  Object.keys(FLAGS).forEach(function(key){
+    const flag = FLAGS[key];
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function(){ flag.image = img; flag.loaded = true; };
+    img.onerror = function(){ console.error('Не удалось загрузить ' + flag.label); };
+    img.src = flag.url;
+  });
+
+  function detectFlag(query){
+    const q = query.toLowerCase();
+    for (const key in FLAGS){
+      const flag = FLAGS[key];
+      if (flag.keys.some(function(k){ return q.includes(k); })) return flag;
+    }
+    return null;
+  }
+
+  function drawFlag(ctx, W, H, flag){
+    ctx.fillStyle = '#ECEFF1';
+    ctx.fillRect(0,0,W,H);
+
+    if (!flag.loaded || !flag.image){
+      ctx.fillStyle = '#f5f5f5';
+      ctx.fillRect(W*0.1, H*0.25, W*0.8, H*0.5);
+      ctx.fillStyle = '#757575';
+      ctx.font = '500 24px Roboto, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(flag.label + ' загружается...', W/2, H/2);
+      ctx.textAlign = 'left';
+      return;
+    }
+
+    const imgRatio = flag.image.width / flag.image.height;
+    const maxW = W * 0.85;
+    const maxH = H * 0.7;
+    let drawW, drawH;
+    if (maxW / imgRatio <= maxH){ drawW = maxW; drawH = drawW / imgRatio; }
+    else { drawH = maxH; drawW = drawH * imgRatio; }
+
+    const dx = (W - drawW) / 2;
+    const dy = (H - drawH) / 2 - 20;
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 10;
+    ctx.drawImage(flag.image, dx, dy, drawW, drawH);
+    ctx.restore();
+  }
+
+  // ==================== АБСТРАКТНАЯ КАРТИНКА ====================
+  function drawAbstract(query){
+    const W = canvas.width, H = canvas.height;
+    const ctx = canvas.getContext('2d');
+    const seed = hash(query.toLowerCase());
+    const rnd = mulberry32(seed);
+
+    const hue = seed % 360;
+    const bg = `hsl(${hue}, 40%, 92%)`;
+    const c1 = `hsl(${(hue+30)%360}, 70%, 55%)`;
+    const c2 = `hsl(${(hue+180)%360}, 65%, 50%)`;
+    const c3 = `hsl(${(hue+90)%360}, 60%, 45%)`;
+    const c4 = `hsl(${(hue+270)%360}, 70%, 60%)`;
+
+    const grad = ctx.createLinearGradient(0,0,W,H);
+    grad.addColorStop(0, bg);
+    grad.addColorStop(1, `hsl(${(hue+60)%360}, 45%, 85%)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,W,H);
+
+    const colors = [c1,c2,c3,c4];
+    const shapes = ['circle','square','triangle','ring'];
+    const count = 30 + (query.length * 3) % 40;
+
+    for (let i=0;i<count;i++){
+      const x = rnd()*W;
+      const y = rnd()*H;
+      const size = 20 + rnd()*140;
+      const rot = rnd()*Math.PI*2;
+      const color = colors[Math.floor(rnd()*colors.length)];
+      const shape = shapes[Math.floor(rnd()*shapes.length)];
+      const alpha = 0.35 + rnd()*0.45;
+
+      ctx.save();
+      ctx.translate(x,y);
+      ctx.rotate(rot);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      ctx.strokeStyle = color;
+
+      if (shape === 'circle'){ ctx.beginPath(); ctx.arc(0,0,size/2,0,Math.PI*2); ctx.fill(); }
+      else if (shape === 'square'){ ctx.fillRect(-size/2,-size/2,size,size); }
+      else if (shape === 'triangle'){
+        ctx.beginPath();
+        ctx.moveTo(0,-size/2); ctx.lineTo(size/2,size/2); ctx.lineTo(-size/2,size/2);
+        ctx.closePath(); ctx.fill();
+      } else {
+        ctx.lineWidth = 6 + rnd()*14;
+        ctx.beginPath(); ctx.arc(0,0,size/2,0,Math.PI*2); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    ctx.globalAlpha = 0.5;
+    for (let i=0;i<8;i++){
+      ctx.strokeStyle = colors[Math.floor(rnd()*colors.length)];
+      ctx.lineWidth = 1 + rnd()*4;
+      ctx.beginPath();
+      ctx.moveTo(rnd()*W, rnd()*H);
+      ctx.bezierCurveTo(rnd()*W, rnd()*H, rnd()*W, rnd()*H, rnd()*W, rnd()*H);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillRect(0, H-60, W, 60);
+    ctx.fillStyle = '#212121';
+    ctx.font = '500 24px Roboto, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('«' + query + '»', 24, H-30);
+  }
+
+  // ==================== ОПРЕДЕЛЕНИЕ ОБЪЕКТОВ ====================
+  const OBJECTS = [
+    { keys:['кот','кошк','cat','кис'],        draw:drawCat,      type:'animal' },
+    { keys:['собак','пёс','пес','dog'],       draw:drawDog,      type:'animal' },
+    { keys:['дом','здан','house','изб'],      draw:drawHouse,    type:'object' },
+    { keys:['дерев','лес','tree','ель','дуб'],draw:drawTree,     type:'object' },
+    { keys:['цвет','flower','роза','ромаш'],  draw:drawFlower,   type:'object' },
+    { keys:['машин','авто','car','тачк'],     draw:drawCar,      type:'object' },
+    { keys:['ракет','rocket','космолёт'],     draw:drawRocket,   type:'object' },
+    { keys:['дракон','dragon'],               draw:drawDragon,   type:'animal' },
+    { keys:['луна','moon','месяц'],           draw:drawMoon,     type:'sky' },
+    { keys:['звезд','звёзд','star'],          draw:drawStar,     type:'sky' },
+    { keys:['птиц','bird','птичк'],           draw:drawBird,     type:'animal' },
+    { keys:['рыб','fish','рыбк'],             draw:drawFish,     type:'animal' },
+    { keys:['робот','robot'],                 draw:drawRobot,    type:'object' },
+    { keys:['гор','mountain','скал'],         draw:drawMountain, type:'object' },
+  ];
+
+  const SKY_WORDS = {
+    sun:  ['солнц','sun','солнечн'],
+    moon: ['луна','moon','ночь','ночн','звёзд','звезд','космос','space'],
+    cloud:['облак','туч','cloud','неб'],
+  };
+
+  const BG_WORDS = {
+    sea:   ['мор','океан','sea','вод','река','озер','пляж'],
+    forest:['лес','дерев','forest','парк','природ'],
+    city:  ['город','city','улиц','здан','небоскрёб'],
+    night: ['ночь','ночн','космос','space','луна','звёзд','звезд'],
+    field: ['пол','луг','поле','field','трав'],
+  };
+
+  function detect(query){
+    const q = query.toLowerCase();
+    const found = [];
+    for (const obj of OBJECTS){
+      if (obj.keys.some(k => q.includes(k))) found.push(obj);
+    }
+    const sky = {};
+    for (const k in SKY_WORDS){ sky[k] = SKY_WORDS[k].some(w => q.includes(w)); }
+    let bg = 'day';
+    for (const k in BG_WORDS){
+      if (BG_WORDS[k].some(w => q.includes(w))) { bg = k; break; }
+    }
+    return { found, sky, bg };
+  }
+
+  // ========================== РИСОВАНИЕ СЦЕНЫ ==========================
+  function drawScene(query){
+    const W = canvas.width, H = canvas.height;
+    const ctx = canvas.getContext('2d');
+
+    const flag = detectFlag(query);
+    if (flag){
+      drawFlag(ctx, W, H, flag);
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.fillRect(0, H-60, W, 60);
+      ctx.fillStyle = '#212121';
+      ctx.font = '500 24px Roboto, sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('«' + query + '» — ' + flag.label, 24, H-30);
+      return;
+    }
+
+    const { found, sky, bg } = detect(query);
+    if (found.length === 0){ drawAbstract(query); return; }
+
+    let grad;
+    if (bg === 'night'){
+      grad = ctx.createLinearGradient(0,0,0,H);
+      grad.addColorStop(0,'#0D1B2A'); grad.addColorStop(1,'#1B263B');
+    } else if (bg === 'sea'){
+      grad = ctx.createLinearGradient(0,0,0,H);
+      grad.addColorStop(0,'#81D4FA'); grad.addColorStop(0.7,'#4FC3F7'); grad.addColorStop(1,'#0277BD');
+    } else if (bg === 'forest'){
+      grad = ctx.createLinearGradient(0,0,0,H);
+      grad.addColorStop(0,'#B3E5FC'); grad.addColorStop(1,'#A5D6A7');
+    } else if (bg === 'city'){
+      grad = ctx.createLinearGradient(0,0,0,H);
+      grad.addColorStop(0,'#90CAF9'); grad.addColorStop(1,'#CFD8DC');
+    } else if (bg === 'field'){
+      grad = ctx.createLinearGradient(0,0,0,H);
+      grad.addColorStop(0,'#B3E5FC'); grad.addColorStop(1,'#C5E1A5');
+    } else {
+      grad = ctx.createLinearGradient(0,0,0,H);
+      grad.addColorStop(0,'#B3E5FC'); grad.addColorStop(1,'#E1F5FE');
+    }
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,W,H);
+
+    if (sky.sun) drawSun(ctx, W*0.82, H*0.18, 45);
+    if (sky.moon) drawMoon(ctx, W*0.82, H*0.18, 50);
+    if (sky.cloud || (!sky.sun && !sky.moon && bg !== 'night')){
+      drawCloud(ctx, W*0.2, H*0.15, 35);
+      drawCloud(ctx, W*0.5, H*0.1, 28);
+      drawCloud(ctx, W*0.75, H*0.22, 24);
+    }
+    if (bg === 'night'){
+      for (let i=0;i<60;i++){
+        const x = (i*137.5) % W;
+        const y = (i*89.7) % (H*0.6);
+        const s = 1 + (i%3);
+        ctx.fillStyle = 'rgba(255,255,255,'+(0.4+(i%5)/10)+')';
+        ctx.beginPath(); ctx.arc(x,y,s,0,Math.PI*2); ctx.fill();
+      }
+    }
+
+    if (bg === 'sea'){
+      ctx.fillStyle = '#0277BD';
+      ctx.fillRect(0, H*0.62, W, H*0.38);
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 3;
+      for (let i=0;i<6;i++){
+        const y = H*0.68 + i*18;
+        ctx.beginPath();
+        for (let x=0;x<=W;x+=40){
+          const off = Math.sin(x/40 + i)*8;
+          x===0 ? ctx.moveTo(x, y+off) : ctx.lineTo(x, y+off);
+        }
+        ctx.stroke();
+      }
+    } else if (bg === 'night'){
+      ctx.fillStyle = '#0B132B';
+      ctx.fillRect(0, H*0.75, W, H*0.25);
+    } else {
+      ctx.fillStyle = '#81C784';
+      ctx.beginPath();
+      ctx.moveTo(0, H*0.72);
+      ctx.quadraticCurveTo(W*0.5, H*0.66, W, H*0.72);
+      ctx.lineTo(W, H); ctx.lineTo(0, H);
+      ctx.closePath(); ctx.fill();
+    }
+
+    const n = found.length;
+    for (let i=0;i<n;i++){
+      const item = found[i];
+      let x, y, s;
+      if (n === 1){ x = W*0.5; y = H*0.55; s = 110; }
+      else if (n === 2){ x = W*(0.3 + i*0.4); y = H*0.58; s = 90; }
+      else { x = W*(0.15 + i*(0.7/(n-1))); y = H*0.62; s = 70; }
+      if (item.type === 'animal' || item.type === 'object'){ y = H*0.72; }
+      item.draw(ctx, x, y, s);
+    }
+
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillRect(0, H-60, W, 60);
+    ctx.fillStyle = '#212121';
+    ctx.font = '500 24px Roboto, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('«' + query + '»', 24, H-30);
+  }
+
+  // ============================ UI-ЛОГИКА ============================
+  function generate(){
+    if (busy) return;
+    const text = input.value.trim();
+    if (!text){
+      status.textContent = 'Введите запрос';
+      progress.classList.add('active');
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(()=>progress.classList.remove('active'), 2000);
+      return;
+    }
+    busy = true;
+    btn.disabled = true;
+    input.disabled = true;
+    progress.classList.add('active');
+    status.textContent = 'Собираю сцену «' + text + '»...';
+
+    const delay = 5000 + Math.floor(Math.random()*5000);
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(()=>{
+      drawScene(text);
+      placeholder.classList.add('hidden');
+      canvas.classList.remove('hidden');
+      canvas.classList.remove('fade-in');
+      void canvas.offsetWidth;
+      canvas.classList.add('fade-in');
+      progress.classList.remove('active');
+      status.textContent = 'Готово!';
+      busy = false;
+      btn.disabled = false;
+      input.disabled = false;
+      timer = null;
+    }, delay);
+  }
+
+  btn.addEventListener('click', generate);
+  input.addEventListener('keypress', e => {
+    if (e.key === 'Enter'){ e.preventDefault(); generate(); }
+  });
+})();
+</script>
+</body>
+  </html>
