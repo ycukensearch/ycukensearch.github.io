@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wi-Fi Мессенджер | Йцукен</title>
+    <title>Wi-Fi Мессенджер</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: system-ui, sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }
         .container { max-width: 800px; margin: 0 auto; width: 100%; height: 100%; display: flex; flex-direction: column; background: white; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
         
-        .header { padding: 15px; background: #075e54; color: white; display: flex; justify-content: space-between; align-items: center; }
+        .header { padding: 15px; background: #075e54; color: white; display: flex; flex-direction: column; gap: 5px; }
         .header h1 { font-size: 1.2rem; }
-        .status { font-size: 0.8rem; opacity: 0.9; }
+        .status { font-size: 0.85rem; opacity: 0.9; word-break: break-all; }
         
         .chat-box { flex: 1; overflow-y: auto; padding: 15px; background: #e5ddd5; display: flex; flex-direction: column; gap: 8px; }
         .message { max-width: 80%; padding: 8px 12px; border-radius: 8px; font-size: 0.95rem; word-break: break-word; position: relative; }
@@ -21,13 +21,13 @@
         .sender { font-size: 0.7rem; color: #666; margin-bottom: 2px; display: block; font-weight: bold; }
         
         .input-area { padding: 10px; background: #f0f0f0; display: flex; gap: 10px; }
-        .input-area input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
+        .input-area input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 20px; outline: none; font-size: 16px; }
         .input-area button { padding: 10px 20px; background: #075e54; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
         .input-area button:disabled { background: #999; }
         
         #join-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; padding: 20px; background: white; }
-        #join-screen input { padding: 12px; width: 100%; max-width: 300px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 10px; font-size: 1rem; }
-        #join-screen button { padding: 12px 30px; background: #075e54; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; width: 100%; max-width: 300px; }
+        #join-screen input { padding: 12px; width: 100%; max-width: 300px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 10px; font-size: 16px; }
+        #join-screen button { padding: 12px 30px; background: #075e54; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%; max-width: 300px; margin-bottom: 10px;}
         #join-screen .hint { margin-top: 15px; font-size: 0.8rem; color: #666; text-align: center; max-width: 300px; }
     </style>
 </head>
@@ -35,8 +35,8 @@
 
 <div class="container" id="app" style="display: none;">
     <div class="header">
-        <h1>Wi-Fi Мессенджер</h1>
-        <span class="status" id="status">Ожидание...</span>
+        <h1>Групповой чат</h1>
+        <span class="status" id="status">Инициализация...</span>
     </div>
     <div class="chat-box" id="chat-box"></div>
     <div class="input-area">
@@ -47,14 +47,15 @@
 
 <div class="container" id="join-screen">
     <h2 style="margin-bottom: 20px; color: #075e54;">Вход в чат</h2>
-    <input type="text" id="username" placeholder="Ваше имя" value="User">
-    <button id="join-btn">Войти</button>
-    <p class="hint">Все устройства должны быть в одной сети Wi-Fi. После входа сообщите свой ID другим или введите ID друга, чтобы создать группу.</p>
     
-    <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; width: 100%; max-width: 300px;">
+    <input type="text" id="username" placeholder="Ваше имя" value="User">
+    <button id="join-btn">Создать / Войти</button>
+    
+    <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; width: 100%; max-width: 300px; display: flex; flex-direction: column; align-items: center;">
         <input type="text" id="host-id-input" placeholder="ID хоста (если вы не первый)">
         <button id="connect-btn" style="background: #34a853;">Подключиться к хосту</button>
     </div>
+    <p class="hint">Все устройства должны быть в одной сети Wi-Fi.</p>
 </div>
 
 <script>
@@ -70,114 +71,121 @@
     let peer = null;
     let myId = null;
     let myName = 'User';
-    let connections = []; // Массив активных соединений
+    let connections = [];
     let isHost = false;
 
-    // Инициализация Peer
-    function initPeer() {
-        // Используем публичный облачный сервер PeerJS только для сигналинга
-        peer = new Peer();
+    // Функция переключения экранов
+    function showApp() {
+        joinScreen.style.display = 'none';
+        appScreen.style.display = 'flex';
+    }
+
+    function updateStatus(text) {
+        statusEl.textContent = text;
+    }
+
+    function addSystemMessage(text) {
+        const div = document.createElement('div');
+        div.style.textAlign = 'center';
+        div.style.color = '#888';
+        div.style.fontSize = '0.8rem';
+        div.style.margin = '5px 0';
+        div.textContent = text;
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function initPeer(customId = null) {
+        updateStatus('Подключение к серверу...');
+        
+        // Создаем пира (с отладкой в консоль)
+        peer = new Peer({ debug: 2 });
+
+        // Таймаут на случай, если сервер не отвечает
+        const timeout = setTimeout(() => {
+            if (!myId) {
+                updateStatus('Ошибка: Сервер не отвечает. Попробуйте VPN или другой браузер.');
+                addSystemMessage('Не удалось подключиться к сигнальному серверу PeerJS. Возможно, он заблокирован.');
+            }
+        }, 10000);
 
         peer.on('open', (id) => {
+            clearTimeout(timeout);
             myId = id;
-            console.log('Мой PeerJS ID:', id);
+            updateStatus(`Ваш ID: ${id.substring(0, 8)}... (Нажмите чтобы скопировать)`);
             
-            // Показываем ID пользователю, чтобы он мог поделиться им
-            statusEl.textContent = `Ваш ID: ${id.substring(0, 8)}...`;
-            
-            // Если мы не подключаемся к кому-то, значит мы становимся хостом
-            if (!hostIdInput.value.trim()) {
+            // Делаем ID кликабельным для копирования
+            statusEl.style.cursor = 'pointer';
+            statusEl.onclick = () => {
+                navigator.clipboard.writeText(id).then(() => {
+                    addSystemMessage('ID скопирован в буфер обмена!');
+                });
+            };
+
+            if (!customId) {
                 isHost = true;
-                joinScreen.style.display = 'none';
-                appScreen.style.display = 'flex';
                 enableInput(true);
-                addSystemMessage(`Вы вошли как ${myName} (Хост). Ваш ID для подключения: ${id}`);
+                addSystemMessage(`Вы вошли как ${myName} (Хост). Ждем подключений...`);
             }
         });
 
         peer.on('connection', (conn) => {
-            // Кто-то подключается к нам
             setupConnection(conn);
+            addSystemMessage('К чату подключился новый участник.');
         });
 
         peer.on('error', (err) => {
+            clearTimeout(timeout);
             console.error('PeerJS Error:', err);
-            alert('Ошибка соединения: ' + err.type + '. Проверьте сеть или обновите страницу.');
-            enableInput(false);
+            updateStatus(`Ошибка: ${err.type}`);
+            
+            // Показываем ошибку прямо в чате
+            if (err.type === 'server-error' || err.type === 'network') {
+                addSystemMessage(`Не удалось связаться с сервером (${err.type}). Проверьте интернет или попробуйте другой браузер (например, Firefox).`);
+            } else {
+                addSystemMessage(`Ошибка соединения: ${err.type}`);
+            }
         });
     }
 
-    // Настройка соединения (входящего или исходящего)
     function setupConnection(conn) {
         conn.on('open', () => {
-            // Добавляем соединение в список
             if (!connections.includes(conn)) {
                 connections.push(conn);
             }
+            updateStatus(`В сети: ${connections.length + 1} чел.`);
             
-            // Если мы хост, сообщаем новому участнику, кто уже есть в чате
-            // (Простая реализация: хост пересылает сообщения всем)
-            
-            updateStatus(`Подключено: ${connections.length} участников`);
+            if (!isHost && !myId) { // Если мы подключаемся к хосту
+                enableInput(true);
+                addSystemMessage('Вы успешно подключились к хосту!');
+            }
         });
 
         conn.on('data', (data) => {
-            handleIncomingData(data, conn);
+            if (data.type === 'chat') {
+                addMessage(data.name, data.text, false);
+                // Если мы хост, пересылаем сообщение остальным
+                if (isHost) {
+                    connections.forEach(c => {
+                        if (c !== conn && c.open) c.send(data);
+                    });
+                }
+            }
         });
 
         conn.on('close', () => {
             connections = connections.filter(c => c !== conn);
-            updateStatus(`Подключено: ${connections.length} участников`);
-            addSystemMessage('Один из участников отключился.');
+            updateStatus(`В сети: ${connections.length + 1} чел.`);
+            addSystemMessage('Участник отключился.');
         });
     }
 
-    // Обработка входящих данных
-    function handleIncomingData(data, sourceConn) {
-        if (data.type === 'chat') {
-            addMessage(data.name, data.text, false);
-            
-            // Если мы хост, пересылаем сообщение остальным (кроме отправителя)
-            if (isHost) {
-                connections.forEach(conn => {
-                    if (conn !== sourceConn && conn.open) {
-                        conn.send(data);
-                    }
-                });
-            }
-        } else if (data.type === 'hello') {
-            // Приветствие от нового участника (для хоста)
-            // В реальном приложении здесь можно обновлять список пользователей
-            addSystemMessage(`${data.name} присоединился к чату.`);
-        }
+    function enableInput(enabled) {
+        msgInput.disabled = !enabled;
+        sendBtn.disabled = !enabled;
+        if (enabled) msgInput.focus();
     }
 
-    // Отправка сообщения
-    function sendMessage() {
-        const text = msgInput.value.trim();
-        if (!text) return;
-
-        const data = {
-            type: 'chat',
-            name: myName,
-            text: text,
-            timestamp: Date.now()
-        };
-
-        // Добавляем сообщение себе в чат
-        addMessage(myName, text, true);
-
-        // Отправляем всем подключенным
-        connections.forEach(conn => {
-            if (conn.open) {
-                conn.send(data);
-            }
-        });
-
-        msgInput.value = '';
-    }
-
-    // Добавление сообщения в UI
     function addMessage(sender, text, isOwn) {
         const div = document.createElement('div');
         div.className = `message ${isOwn ? 'own' : 'other'}`;
@@ -192,86 +200,55 @@
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    function addSystemMessage(text) {
-        const div = document.createElement('div');
-        div.style.textAlign = 'center';
-        div.style.color = '#888';
-        div.style.fontSize = '0.8rem';
-        div.style.margin = '5px 0';
-        div.textContent = text;
-        chatBox.appendChild(div);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    function updateStatus(text) {
-        if (myId) {
-            statusEl.textContent = text;
-        }
-    }
-
-    function enableInput(enabled) {
-        msgInput.disabled = !enabled;
-        sendBtn.disabled = !enabled;
-    }
-
-    // Обработчики кнопок
+    // Обработчик кнопки "Создать / Войти"
     document.getElementById('join-btn').addEventListener('click', () => {
         myName = usernameInput.value.trim() || 'User';
-        joinScreen.style.display = 'none';
-        // Инициализация начнется после ввода ID хоста (или его отсутствия)
-        initPeer();
+        showApp(); // СРАЗУ показываем экран чата
+        initPeer(); // Запускаем подключение
     });
 
+    // Обработчик кнопки "Подключиться к хосту"
     document.getElementById('connect-btn').addEventListener('click', () => {
         const hostId = hostIdInput.value.trim();
         if (!hostId) {
-            alert('Введите ID хоста');
+            alert('Введите ID хоста!');
             return;
         }
         
         myName = usernameInput.value.trim() || 'User';
-        joinScreen.style.display = 'none';
+        showApp(); // СРАЗУ показываем экран чата
+        addSystemMessage(`Попытка подключения к ${hostId.substring(0,8)}...`);
         
-        // Инициализируем пира
-        peer = new Peer();
+        initPeer(hostId); // Запускаем подключение
         
-        peer.on('open', (id) => {
-            myId = id;
-            // Подключаемся к хосту
-            const conn = peer.connect(hostId);
-            
-            conn.on('open', () => {
-                connections.push(conn);
-                appScreen.style.display = 'flex';
-                enableInput(true);
-                updateStatus('Подключено к хосту');
-                addSystemMessage(`Вы подключились к хосту ${hostId.substring(0,8)}...`);
-                
-                // Отправляем приветствие
-                conn.send({ type: 'hello', name: myName });
-            });
-
-            // Обработка входящих от хоста
-            conn.on('data', (data) => {
-                handleIncomingData(data, conn);
-            });
-
-            conn.on('close', () => {
-                addSystemMessage('Соединение с хостом потеряно.');
-                enableInput(false);
-            });
-            
-            conn.on('error', (err) => {
-                alert('Не удалось подключиться к хосту. Проверьте ID.');
-                location.reload();
-            });
-        });
-        
-        peer.on('error', (err) => {
-            console.error(err);
-            alert('Ошибка: ' + err.type);
-        });
+        // Ждем, пока пир откроется, и подключаемся
+        const checkOpen = setInterval(() => {
+            if (myId) {
+                clearInterval(checkOpen);
+                updateStatus('Подключение к хосту...');
+                const conn = peer.connect(hostId);
+                setupConnection(conn);
+                conn.on('open', () => {
+                    enableInput(true);
+                    addSystemMessage('Вы подключились!');
+                });
+            }
+        }, 500);
     });
+
+    function sendMessage() {
+        const text = msgInput.value.trim();
+        if (!text) return;
+
+        const data = { type: 'chat', name: myName, text: text };
+        addMessage(myName, text, true);
+
+        connections.forEach(conn => {
+            if (conn.open) conn.send(data);
+        });
+
+        msgInput.value = '';
+    }
 
     sendBtn.addEventListener('click', sendMessage);
     msgInput.addEventListener('keypress', (e) => {
@@ -280,4 +257,4 @@
 </script>
 
 </body>
-                                                      </html>
+</html>
