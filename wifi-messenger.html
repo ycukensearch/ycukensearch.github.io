@@ -5,98 +5,322 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wi-Fi Мессенджер</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: system-ui, sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        .container { max-width: 800px; margin: 0 auto; width: 100%; height: 100%; display: flex; flex-direction: column; background: white; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        /* --- БАЗОВЫЕ СТИЛИ (ICQ 2012) --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         
-        .header { padding: 15px; background: #075e54; color: white; }
-        .header h1 { font-size: 1.2rem; }
+        body { 
+            background-color: #e6e6e6; 
+            background-image: linear-gradient(#f0f0f0 1px, transparent 1px);
+            background-size: 100% 4px;
+            height: 100vh; 
+            display: flex; 
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            color: #333;
+        }
+
+        /* Главное окно программы */
+        .icq-window { 
+            width: 100%; 
+            max-width: 600px; 
+            height: 95%; 
+            max-height: 800px;
+            background: #f4f4f4; 
+            border: 1px solid #a0a0a0;
+            border-radius: 6px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Шапка окна (Титульная строка) */
+        .title-bar {
+            background: linear-gradient(to bottom, #82c43c, #5a9620); /* Зеленый градиент ICQ */
+            color: white;
+            padding: 6px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #3a6a0f;
+            font-weight: bold;
+            font-size: 14px;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+        }
         
-        .chat-box { flex: 1; overflow-y: auto; padding: 15px; background: #e5ddd5; display: flex; flex-direction: column; gap: 8px; }
-        .message { max-width: 80%; padding: 8px 12px; border-radius: 8px; font-size: 0.95rem; word-break: break-word; }
-        .message.own { align-self: flex-end; background: #dcf8c6; }
-        .message.other { align-self: flex-start; background: white; }
-        .system-msg { text-align: center; color: #888; font-size: 0.8rem; margin: 5px 0; }
-        
-        .input-area { padding: 10px; background: #f0f0f0; display: flex; gap: 10px; }
-        .input-area input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 20px; outline: none; font-size: 16px; }
-        .input-area button { padding: 10px 20px; background: #075e54; color: white; border: none; border-radius: 20px; font-weight: bold; }
-        
-        .screen { display: none; flex-direction: column; padding: 20px; height: 100%; overflow-y: auto; }
+        .window-controls { display: flex; gap: 5px; }
+        .win-btn { 
+            width: 18px; height: 18px; 
+            background: rgba(255,255,255,0.2); 
+            border: 1px solid rgba(255,255,255,0.4); 
+            border-radius: 3px; 
+            display: flex; justify-content: center; align-items: center;
+            font-size: 12px; cursor: pointer;
+        }
+
+        /* Контентная часть */
+        .content-area { display: flex; flex-direction: column; height: 100%; background: #fff; }
+
+        /* Экраны подключения */
+        .screen { display: none; flex-direction: column; padding: 20px; height: 100%; overflow-y: auto; background: #f4f4f4; }
         .screen.active { display: flex; }
         
-        /* Стили для текстовых полей с кодом */
-        textarea { 
-            width: 100%; 
-            height: 100px; 
-            padding: 10px; 
-            border: 1px solid #ccc; 
-            border-radius: 8px; 
-            font-family: monospace; 
-            font-size: 12px; 
-            margin-bottom: 10px; 
-            resize: none;
-            background: #f9f9f9;
-        }
-        input[type="text"] { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; margin-bottom: 10px; text-align: center; font-weight: bold; }
-        
-        .btn { padding: 12px; background: #075e54; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-bottom: 10px; width: 100%; font-weight: bold; }
-        .btn-green { background: #34a853; }
+        .screen h2 { margin-bottom: 15px; color: #5a9620; font-size: 18px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
         .hint { font-size: 0.85rem; color: #666; margin-bottom: 15px; line-height: 1.4; }
-        h2 { margin-bottom: 15px; color: #075e54; }
+        
+        textarea { 
+            width: 100%; height: 80px; padding: 8px; 
+            border: 1px solid #a0a0a0; border-radius: 3px; 
+            font-family: monospace; font-size: 12px; 
+            margin-bottom: 10px; resize: none; 
+            background: #fff; 
+        }
+        
+        .btn { 
+            padding: 8px 15px; 
+            background: linear-gradient(to bottom, #f9f9f9, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            border-radius: 4px;
+            color: #333;
+            font-size: 13px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            width: 100%;
+            font-weight: bold;
+            text-shadow: 1px 1px 0 #fff;
+        }
+        .btn:hover { background: linear-gradient(to bottom, #fff, #d0d0d0); }
+        .btn:active { background: #d0d0d0; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2); }
+        
+        .btn-green { 
+            background: linear-gradient(to bottom, #82c43c, #5a9620);
+            border: 1px solid #3a6a0f;
+            color: white;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+        }
+        .btn-green:hover { background: linear-gradient(to bottom, #92d44c, #6aa630); }
+
+        /* --- ЭКРАН ЧАТА --- */
+        #screen-chat { padding: 0; background: #e6e6e6; }
+        
+        /* Область сообщений */
+        .chat-box { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 10px; 
+            background: #fff; 
+            border-bottom: 1px solid #ccc;
+            display: flex; 
+            flex-direction: column; 
+            gap: 8px; 
+        }
+
+        /* Сообщения в стиле ICQ */
+        .message-wrapper { display: flex; flex-direction: column; margin-bottom: 5px; }
+        .message-wrapper.own { align-items: flex-end; }
+        .message-wrapper.other { align-items: flex-start; }
+        
+        .msg-sender { font-size: 11px; color: #5a9620; font-weight: bold; margin-bottom: 2px; margin-left: 5px; }
+        
+        .message { 
+            max-width: 80%; 
+            padding: 6px 10px; 
+            border-radius: 5px; 
+            font-size: 14px; 
+            word-break: break-word; 
+            position: relative;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        
+        .message.own { 
+            background: #e6f5c9; /* Светло-зеленый для своих */
+            border: 1px solid #c5e1a5; 
+        }
+        .message.other { 
+            background: #f0f0f0; /* Серый для чужих */
+            border: 1px solid #ddd;
+        }
+        
+        .system-msg { 
+            text-align: center; 
+            color: #888; 
+            font-size: 11px; 
+            margin: 10px 0; 
+            background: #f9f9f9;
+            padding: 2px 5px;
+            border-radius: 3px;
+            align-self: center;
+        }
+
+        /* Медиа внутри чата */
+        .media-container { margin-top: 5px; border-radius: 4px; overflow: hidden; max-width: 100%; border: 1px solid #ccc; background: #000; }
+        .media-container img, .media-container video { max-width: 100%; max-height: 250px; display: block; }
+        
+        .progress-bar { width: 100%; height: 6px; background: #ddd; border-top: 1px solid #ccc; display: none; }
+        .progress-fill { height: 100%; width: 0%; background: #82c43c; transition: width 0.2s; }
+
+        /* --- ПАНЕЛЬ СМАЙЛИКОВ --- */
+        .emoji-panel {
+            display: none; /* Скрыто по умолчанию */
+            background: #f4f4f4;
+            border-top: 1px solid #a0a0a0;
+            padding: 5px;
+            height: 100px;
+            overflow-y: auto;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            gap: 2px;
+        }
+        .emoji-panel.show { display: flex; }
+        
+        .emoji-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 3px;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 2px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .emoji-btn:hover {
+            background: #fff;
+            border-color: #a0a0a0;
+        }
+
+        /* Панель ввода */
+        .input-area { 
+            background: #f0f0f0; 
+            padding: 8px; 
+            display: flex; 
+            flex-direction: column;
+            gap: 5px;
+            border-top: 1px solid #ccc;
+        }
+        
+        .input-row { display: flex; gap: 5px; align-items: center; }
+        
+        .input-area input[type="text"] { 
+            flex: 1; 
+            padding: 8px; 
+            border: 1px solid #a0a0a0; 
+            border-radius: 3px; 
+            outline: none; 
+            font-size: 14px; 
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+        }
+        
+        .tool-btn {
+            padding: 6px 10px; 
+            background: linear-gradient(to bottom, #f9f9f9, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            color: #333;
+        }
+        .tool-btn:hover { background: #fff; }
+        .tool-btn:disabled { opacity: 0.5; }
+        
+        .send-btn { 
+            background: linear-gradient(to bottom, #82c43c, #5a9620);
+            border: 1px solid #3a6a0f;
+            color: white; 
+            font-weight: bold;
+            padding: 6px 15px;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+        }
     </style>
 </head>
 <body>
 
-<!-- Экран выбора -->
-<div class="screen active" id="screen-start">
-    <h2>Wi-Fi мессенджер</h2>
-    <p class="hint">Соединение напрямую между устройствами. Серверы не используются.</p>
-    <button class="btn" id="btn-host">Я создаю чат (Хост)</button>
-    <button class="btn btn-green" id="btn-guest">Я подключаюсь (Гость)</button>
-</div>
-
-<!-- Экран Хоста -->
-<div class="screen" id="screen-host">
-    <h2>Вы Хост</h2>
-    <p class="hint"><b>Шаг 1:</b> Выделите весь код ниже, скопируйте его и отправьте другу:</p>
-    <textarea id="host-code-out" readonly placeholder="Генерация кода..."></textarea>
-    
-    <p class="hint" style="margin-top: 10px;"><b>Шаг 2:</b> Вставьте ответный код от друга сюда:</p>
-    <textarea id="host-answer-in" placeholder="Вставьте ответный код..."></textarea>
-    <button class="btn btn-green" id="btn-accept-answer">Подключиться к чату</button>
-</div>
-
-<!-- Экран Гостя -->
-<div class="screen" id="screen-guest">
-    <h2>Вы Гость</h2>
-    <p class="hint"><b>Шаг 1:</b> Вставьте код от хоста сюда:</p>
-    <textarea id="guest-offer-in" placeholder="Вставьте код от хоста..."></textarea>
-    <button class="btn" id="btn-process-offer">Обработать код</button>
-
-    <div id="guest-answer-section" style="display: none; margin-top: 20px;">
-        <p class="hint"><b>Шаг 2:</b> Скопируйте этот ответ и отправьте его обратно хосту:</p>
-        <textarea id="guest-code-out" readonly></textarea>
+<div class="icq-window">
+    <!-- Шапка в стиле Windows/ICQ -->
+    <div class="title-bar">
+        <span>Wi-Fi Мессенджер</span>
+        <div class="window-controls">
+            <div class="win-btn">_</div>
+            <div class="win-btn">□</div>
+            <div class="win-btn">×</div>
+        </div>
     </div>
-</div>
 
-<!-- Экран Чата -->
-<div class="screen" id="screen-chat" style="padding: 0;">
-    <div class="header">
-        <h1>Чат</h1>
-    </div>
-    <div class="chat-box" id="chat-box"></div>
-    <div class="input-area">
-        <input type="text" id="msg-input" placeholder="Сообщение..." disabled>
-        <button id="send-btn" disabled>➤</button>
+    <div class="content-area">
+        <!-- Экран выбора -->
+        <div class="screen active" id="screen-start">
+            <h2>Добро пожаловать!</h2>
+            <p class="hint">Прямое соединение без серверов. Поддерживаются фото, видео и смайлики.</p>
+            <button class="btn btn-green" id="btn-host">Создать чат (Хост)</button>
+            <button class="btn" id="btn-guest">Подключиться (Гость)</button>
+        </div>
+
+        <!-- Экран Хоста -->
+        <div class="screen" id="screen-host">
+            <h2>Вы Хост</h2>
+            <p class="hint"><b>Шаг 1:</b> Скопируйте код и отправьте другу:</p>
+            <textarea id="host-code-out" readonly placeholder="Генерация кода..."></textarea>
+            
+            <p class="hint" style="margin-top: 10px;"><b>Шаг 2:</b> Вставьте ответный код:</p>
+            <textarea id="host-answer-in" placeholder="Вставьте ответный код..."></textarea>
+            <button class="btn btn-green" id="btn-accept-answer">Подключиться</button>
+        </div>
+
+        <!-- Экран Гостя -->
+        <div class="screen" id="screen-guest">
+            <h2>Вы Гость</h2>
+            <p class="hint"><b>Шаг 1:</b> Вставьте код хоста:</p>
+            <textarea id="guest-offer-in" placeholder="Вставьте код от хоста..."></textarea>
+            <button class="btn" id="btn-process-offer">Обработать</button>
+
+            <div id="guest-answer-section" style="display: none; margin-top: 20px;">
+                <p class="hint"><b>Шаг 2:</b> Отправьте этот ответ хосту:</p>
+                <textarea id="guest-code-out" readonly></textarea>
+            </div>
+        </div>
+
+        <!-- Экран Чата -->
+        <div class="screen" id="screen-chat">
+            <div class="chat-box" id="chat-box"></div>
+            
+            <div id="upload-progress" class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+            
+            <!-- Панель смайликов -->
+            <div class="emoji-panel" id="emoji-panel">
+                <!-- Смайлики будут добавлены через JS -->
+            </div>
+
+            <div class="input-area">
+                <div class="input-row">
+                    <button class="tool-btn" id="emoji-btn" title="Смайлики">😊</button>
+                    <button class="tool-btn" id="file-btn" disabled title="Прикрепить файл">📎</button>
+                    <input type="file" id="file-input" accept="image/*,video/*" style="display: none;">
+                    <input type="text" id="msg-input" placeholder="Введите сообщение..." disabled>
+                    <button class="tool-btn send-btn" id="send-btn" disabled>Отправить</button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <script>
     let pc = null;
     let dc = null;
+    
+    // Файлы
+    let incomingFileInfo = null;
+    let incomingFileData = [];
+    let receivedSize = 0;
+    const CHUNK_SIZE = 16384;
+    let fileToSend = null;
+    let sendingOffset = 0;
 
-    // Кодирование в Base64
+    // Кодирование
     function encodeSDP(sdp) {
         if (!sdp) return '';
         return btoa(JSON.stringify(sdp)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
@@ -113,7 +337,45 @@
         document.getElementById(id).classList.add('active');
     }
 
-    // --- ЛОГИКА ХОСТА ---
+    // --- СМАЙЛИКИ ---
+    const emojis = [
+        '😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇',
+        '🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚',
+        '😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🤩',
+        '🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣',
+        '😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬',
+        '🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗',
+        '🤔','🤭','🤫','🤥','😶','😐','😑','😬','🙄','😯',
+        '😦','😧','😮','😲','🥱','😴','🤤','😪','😵','🤐',
+        '🥴','🤢','🤮','🤧','😷','🤒','🤕','🤑','🤠','😈',
+        '👿','👹','👺','🤡','💩','👻','💀','☠️','👽','👾',
+        '🤖','🎃','😺','😸','😹','😻','😼','😽','🙀','😿',
+        '😾','👋','🤚','🖐','✋','🖖','👌','🤏','✌️','🤞',
+        '🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍',
+        '👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝',
+        '🙏','✍️','💅','🤳','💪','🦾','🦿','🦵','🦶','👂',
+        '🦻','👃','🧠','🦷','🦴','👀','👁','👅','👄','💋',
+        '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔'
+    ];
+
+    const emojiPanel = document.getElementById('emoji-panel');
+    emojis.forEach(emoji => {
+        const btn = document.createElement('button');
+        btn.className = 'emoji-btn';
+        btn.textContent = emoji;
+        btn.onclick = () => {
+            const input = document.getElementById('msg-input');
+            input.value += emoji;
+            input.focus();
+        };
+        emojiPanel.appendChild(btn);
+    });
+
+    document.getElementById('emoji-btn').onclick = () => {
+        emojiPanel.classList.toggle('show');
+    };
+
+    // --- ЛОГИКА WEBRTC ---
     document.getElementById('btn-host').onclick = async () => {
         showScreen('screen-host');
         document.getElementById('host-code-out').value = 'Генерация...';
@@ -125,7 +387,6 @@
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        // Даем 1.5 секунды на сбор данных и выдаем код
         setTimeout(() => {
             document.getElementById('host-code-out').value = encodeSDP(pc.localDescription);
         }, 1500);
@@ -135,19 +396,14 @@
         const code = document.getElementById('host-answer-in').value.trim();
         const answer = decodeSDP(code);
         if (!answer) return alert('Неверный ответный код!');
-        
         try {
             await pc.setRemoteDescription(new RTCSessionDescription(answer));
-            // Ждем открытия канала, чтобы переключить экран
         } catch (e) {
-            alert('Ошибка подключения. Убедитесь, что скопировали код полностью.');
+            alert('Ошибка подключения. Код поврежден.');
         }
     };
 
-    // --- ЛОГИКА ГОСТЯ ---
-    document.getElementById('btn-guest').onclick = () => {
-        showScreen('screen-guest');
-    };
+    document.getElementById('btn-guest').onclick = () => showScreen('screen-guest');
 
     document.getElementById('btn-process-offer').onclick = async () => {
         const code = document.getElementById('guest-offer-in').value.trim();
@@ -162,32 +418,56 @@
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
 
-            // Даем 1.5 секунды на сбор и показываем ответ
             setTimeout(() => {
                 document.getElementById('guest-code-out').value = encodeSDP(pc.localDescription);
                 document.getElementById('guest-answer-section').style.display = 'block';
             }, 1500);
-
         } catch (e) {
-            alert('Ошибка обработки кода. Проверьте, что вставили его целиком.');
+            alert('Ошибка обработки кода хоста.');
         }
     };
 
-    // --- ЛОГИКА ЧАТА ---
+    // --- ОБМЕН ДАННЫМИ ---
     function setupDataChannel(channel) {
         dc = channel;
         dc.onopen = () => {
             showScreen('screen-chat');
             document.getElementById('msg-input').disabled = false;
             document.getElementById('send-btn').disabled = false;
+            document.getElementById('file-btn').disabled = false;
             addSystemMessage('Соединение установлено!');
         };
+        
         dc.onmessage = (e) => {
             const data = JSON.parse(e.data);
-            addMessage(data.text, false);
+            if (data.type === 'text') {
+                addMessage(data.text, false);
+            } else if (data.type === 'file-start') {
+                incomingFileInfo = data;
+                incomingFileData = [];
+                receivedSize = 0;
+                addSystemMessage(`Получение: ${data.name} (${(data.size / 1024 / 1024).toFixed(2)} МБ)`);
+                document.getElementById('upload-progress').style.display = 'block';
+            } else if (data.type === 'file-chunk') {
+                incomingFileData.push(new Uint8Array(data.data));
+                receivedSize += data.data.length;
+                const progress = (receivedSize / incomingFileInfo.size) * 100;
+                document.getElementById('progress-fill').style.width = progress + '%';
+            } else if (data.type === 'file-end') {
+                const blob = new Blob(incomingFileData, { type: incomingFileInfo.mime });
+                const url = URL.createObjectURL(blob);
+                addMedia(url, incomingFileInfo.mime, false, incomingFileInfo.name);
+                addSystemMessage(`Файл ${incomingFileInfo.name} получен.`);
+                incomingFileInfo = null;
+                incomingFileData = [];
+                receivedSize = 0;
+                document.getElementById('upload-progress').style.display = 'none';
+                document.getElementById('progress-fill').style.width = '0%';
+            }
         };
     }
 
+    // --- ОТПРАВКА ---
     document.getElementById('send-btn').onclick = sendMessage;
     document.getElementById('msg-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') sendMessage();
@@ -197,17 +477,101 @@
         const input = document.getElementById('msg-input');
         const text = input.value.trim();
         if (!text || !dc || dc.readyState !== 'open') return;
-        dc.send(JSON.stringify({ text }));
+        dc.send(JSON.stringify({ type: 'text', text: text }));
         addMessage(text, true);
         input.value = '';
     }
 
+    document.getElementById('file-btn').onclick = () => document.getElementById('file-input').click();
+
+    document.getElementById('file-input').onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file || !dc || dc.readyState !== 'open') return;
+
+        fileToSend = file;
+        sendingOffset = 0;
+        document.getElementById('upload-progress').style.display = 'block';
+        addSystemMessage(`Отправка: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} МБ)...`);
+
+        dc.send(JSON.stringify({ type: 'file-start', name: file.name, size: file.size, mime: file.type }));
+        readNextChunk(file);
+        e.target.value = '';
+    };
+
+    function readNextChunk(file) {
+        const reader = new FileReader();
+        const slice = file.slice(sendingOffset, sendingOffset + CHUNK_SIZE);
+        
+        reader.onload = (e) => {
+            if (e.target.result) {
+                dc.send(JSON.stringify({ type: 'file-chunk', data: Array.from(new Uint8Array(e.target.result)) }));
+                sendingOffset += CHUNK_SIZE;
+                const progress = (sendingOffset / file.size) * 100;
+                document.getElementById('progress-fill').style.width = Math.min(progress, 100) + '%';
+                
+                if (sendingOffset < file.size) {
+                    setTimeout(() => readNextChunk(file), 10);
+                } else {
+                    dc.send(JSON.stringify({ type: 'file-end' }));
+                    addSystemMessage(`Файл ${file.name} отправлен.`);
+                    const url = URL.createObjectURL(file);
+                    addMedia(url, file.type, true, file.name);
+                    document.getElementById('upload-progress').style.display = 'none';
+                    document.getElementById('progress-fill').style.width = '0%';
+                }
+            }
+        };
+        reader.readAsArrayBuffer(slice);
+    }
+
+    // --- ОТРИСОВКА ---
     function addMessage(text, isOwn) {
         const box = document.getElementById('chat-box');
+        const wrapper = document.createElement('div');
+        wrapper.className = `message-wrapper ${isOwn ? 'own' : 'other'}`;
+        
+        if (!isOwn) {
+            const sender = document.createElement('div');
+            sender.className = 'msg-sender';
+            sender.textContent = 'Собеседник';
+            wrapper.appendChild(sender);
+        }
+
         const div = document.createElement('div');
         div.className = `message ${isOwn ? 'own' : 'other'}`;
         div.textContent = text;
-        box.appendChild(div);
+        wrapper.appendChild(div);
+        
+        box.appendChild(wrapper);
+        box.scrollTop = box.scrollHeight;
+    }
+    
+    function addMedia(url, mime, isOwn, filename) {
+        const box = document.getElementById('chat-box');
+        const wrapper = document.createElement('div');
+        wrapper.className = `message-wrapper ${isOwn ? 'own' : 'other'}`;
+        
+        const div = document.createElement('div');
+        div.className = `message ${isOwn ? 'own' : 'other'}`;
+        div.style.padding = '4px';
+
+        const container = document.createElement('div');
+        container.className = 'media-container';
+
+        if (mime.startsWith('image/')) {
+            const img = document.createElement('img');
+            img.src = url;
+            container.appendChild(img);
+        } else if (mime.startsWith('video/')) {
+            const video = document.createElement('video');
+            video.src = url;
+            video.controls = true;
+            container.appendChild(video);
+        }
+
+        div.appendChild(container);
+        wrapper.appendChild(div);
+        box.appendChild(wrapper);
         box.scrollTop = box.scrollHeight;
     }
     
@@ -222,4 +586,4 @@
 </script>
 
 </body>
-    </html>
+                </html>
